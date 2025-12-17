@@ -2,23 +2,62 @@ const express = require("express");
 const connectdb = require("./config/database");
 const {adminAuth} = require("./middlewares/auth");
 const  User = require("./models/user");
-const { model } = require("mongoose");
-
+const {validateSignupData} = require("./utils/validate");
+const bcrypt = require("bcrypt");
+const { default: isEmail } = require("validator/lib/isEmail");
 
 const app = express();
 
 app.use(express.json());
 
 app.post("/signup", async (req, res)=>{
-     const user = new User(req.body);
      try {
+          //validate request body
+          validateSignupData(req);
+
+          //Encrypt the password
+          const { firstName,lastName,emailId,password } = req.body;
+          const saltRounds = 10;
+          const passwordHash = await bcrypt.hash(password,saltRounds);
+
+          //creating new instance of User model
+          const user = new User({
+               firstName,
+               lastName,
+               emailId,
+               password: passwordHash
+          });
           await user.save();
           res.send("User saved successfully!");
 
      } catch(error) {
-          res.status(400).send("error occured while saving request"+ error.message);
+          res.status(400).send("ERROR : "+ error.message);
      }
 });
+
+
+app.post("/login", async (req, res)=>{
+     try {
+          const { emailId, password } = req.body;
+
+          const user = await User.findOne({emailId: emailId});
+
+          if(user.length === 0){
+               throw new Error("Inavalid emailId..");
+          }
+          
+          isPasswordValid = await bcrypt.compare(password, user.password);
+
+          if(!isPasswordValid){
+               throw new Error("Inavalid password..");
+          }
+          res.send("login successful!");
+
+
+     }catch(err){
+          res.status(400).send("ERROR : "+ err.message);
+     }
+})
 
 //get user by email id
 app.get("/user", async (req, res) => {
@@ -70,9 +109,20 @@ app.patch("/update", async (req, res) => {
      const data = req.body;
 
      console.log("data=", data);
-     console.log("id=", id)
+     console.log("id=", id);
 
      try {
+          //validate allow only fields that can be updated
+          const ALLOWED_UPDATES = new Set (["firstName", "lastName","password","age", "gender","photoUrl","about","skills"]);
+
+          const iSUpadteAllowed = Object.keys(data).every((key)=>{
+               return ALLOWED_UPDATES.has(key);
+          });
+
+          if(!iSUpadteAllowed){
+             throw new Error("User email can not be updated");
+          }
+
           const result = await User.findByIdAndUpdate(id, data, {runValidators: true});  //upadte first doc
 
           if (!result) {
