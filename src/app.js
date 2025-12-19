@@ -4,11 +4,13 @@ const {adminAuth} = require("./middlewares/auth");
 const  User = require("./models/user");
 const {validateSignupData} = require("./utils/validate");
 const bcrypt = require("bcrypt");
-const { default: isEmail } = require("validator/lib/isEmail");
+const cookieParser = require("cookie-parser");
+const jwt = require("jsonwebtoken");
 
 const app = express();
 
 app.use(express.json());
+app.use(cookieParser());
 
 app.post("/signup", async (req, res)=>{
      try {
@@ -43,22 +45,24 @@ app.post("/login", async (req, res)=>{
           const user = await User.findOne({emailId: emailId});
 
           if(user.length === 0){
-               throw new Error("Inavalid emailId..");
+               throw new Error("Inavalid Credentials..");
           }
           
           isPasswordValid = await bcrypt.compare(password, user.password);
 
-          if(!isPasswordValid){
-               throw new Error("Inavalid password..");
+          if(isPasswordValid) {
+               var token =  await jwt.sign({_id : user._id}, "DevTinder@App123");
+               res.cookie("token", token);
+               res.send("loginess successful!");
+          }else {
+               throw new Error("Inavalid Credentials..");
           }
-          res.send("login successful!");
-
 
      }catch(err){
           res.status(400).send("ERROR : "+ err.message);
      }
 })
-
+ 
 //get user by email id
 app.get("/user", async (req, res) => {
      const userEmail = req.query.emailId;
@@ -72,6 +76,32 @@ app.get("/user", async (req, res) => {
           }
      } catch (err) {
           res.status(404).send("not found" + err.message)
+     }
+});
+
+app.get("/profile", async (req,res)=>{
+     try{
+      const cookies = req.cookies;
+
+      const { token } = cookies;
+
+      if(!token) {
+          throw new Error("Inavalid token.");
+      }
+      //validate token
+      decodedMessage = await jwt.verify(token,"DevTinder@App123");
+
+      const { _id } = decodedMessage;
+     
+      const user = await User.findOne({_id});
+
+      if(!user){
+        throw new Error("User does not exist.");
+      }
+      res.send("Logged in successfuly.  "+ user);
+    
+     } catch(err) {
+          res.status(400).send("ERROR : "+ err.message);
      }
 });
 
