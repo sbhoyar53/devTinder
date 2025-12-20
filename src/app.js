@@ -6,6 +6,7 @@ const {validateSignupData} = require("./utils/validate");
 const bcrypt = require("bcrypt");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
+const {userAuth} = require("./middlewares/auth");
 
 const app = express();
 
@@ -38,28 +39,24 @@ app.post("/signup", async (req, res)=>{
 });
 
 
-app.post("/login", async (req, res)=>{
+app.post("/login",  async (req, res)=>{
      try {
           const { emailId, password } = req.body;
 
-          const user = await User.findOne({emailId: emailId});
-
-          if(user.length === 0){
+          const user = await User.findOne({ emailId: emailId });
+          if (user.length === 0) {
                throw new Error("Inavalid Credentials..");
           }
-          
           isPasswordValid = await bcrypt.compare(password, user.password);
-
-          if(isPasswordValid) {
-               var token =  await jwt.sign({_id : user._id}, "DevTinder@App123");
-               res.cookie("token", token);
-               res.send("loginess successful!");
-          }else {
+          if (isPasswordValid) {
+               const token = await jwt.sign({ _id: user._id }, "DevTinder@App123"); //generate jwt token
+               res.cookie("token",token); //send token back 
+               res.send("login successful!");
+          } else {
                throw new Error("Inavalid Credentials..");
           }
-
-     }catch(err){
-          res.status(400).send("ERROR : "+ err.message);
+     } catch (err) {
+          res.status(400).send("ERROR : " + err.message);
      }
 })
  
@@ -79,30 +76,8 @@ app.get("/user", async (req, res) => {
      }
 });
 
-app.get("/profile", async (req,res)=>{
-     try{
-      const cookies = req.cookies;
-
-      const { token } = cookies;
-
-      if(!token) {
-          throw new Error("Inavalid token.");
-      }
-      //validate token
-      decodedMessage = await jwt.verify(token,"DevTinder@App123");
-
-      const { _id } = decodedMessage;
-     
-      const user = await User.findOne({_id});
-
-      if(!user){
-        throw new Error("User does not exist.");
-      }
-      res.send("Logged in successfuly.  "+ user);
-    
-     } catch(err) {
-          res.status(400).send("ERROR : "+ err.message);
-     }
+app.get("/profile",userAuth, async (req,res)=>{
+      res.send("Logged in successfuly.  "+ req.user);
 });
 
 //Feed API -Get/feed - get all the users from database
