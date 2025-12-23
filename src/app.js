@@ -1,11 +1,9 @@
 const express = require("express");
 const connectdb = require("./config/database");
-const {adminAuth} = require("./middlewares/auth");
 const  User = require("./models/user");
 const {validateSignupData} = require("./utils/validate");
 const bcrypt = require("bcrypt");
 const cookieParser = require("cookie-parser");
-const jwt = require("jsonwebtoken");
 const {userAuth} = require("./middlewares/auth");
 
 const app = express();
@@ -47,9 +45,10 @@ app.post("/login",  async (req, res)=>{
           if (user.length === 0) {
                throw new Error("Inavalid Credentials..");
           }
-          isPasswordValid = await bcrypt.compare(password, user.password);
+          const isPasswordValid = await user.validatePassword(password); //validatePassword schema method
+
           if (isPasswordValid) {
-               const token = await jwt.sign({ _id: user._id }, "DevTinder@App123"); //generate jwt token
+               const token = await user.getJwt(); //generate token(schema mthod)
                res.cookie("token",token); //send token back 
                res.send("login successful!");
           } else {
@@ -112,10 +111,6 @@ app.delete("/delete", async (req,res) => {
 app.patch("/update", async (req, res) => {
      const id = req.query._id;
      const data = req.body;
-
-     console.log("data=", data);
-     console.log("id=", id);
-
      try {
           //validate allow only fields that can be updated
           const ALLOWED_UPDATES = new Set (["firstName", "lastName","password","age", "gender","photoUrl","about","skills"]);
@@ -149,7 +144,7 @@ connectdb()
     console.log("database connection established successfully");
 })
 .catch((error)=>{
-    console.error("database can not connected!!");
+    console.error("database can not connected!!  "+ error);
 })
 
 app.listen(7777);
